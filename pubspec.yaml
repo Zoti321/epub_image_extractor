@@ -1,8 +1,8 @@
 name: epub_image_extractor
 description: EPUB 解析器，用于提取标题和图片，支持按阅读顺序排序和智能重命名
 version: 1.0.0
-homepage: https://github.com/yourusername/epub_image_extractor
-repository: https://github.com/yourusername/epub_image_extractor
+homepage: https://github.com/Zoti321/epub_image_extractor
+repository: https://github.com/Zoti321/epub_image_extractor
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
