@@ -1,0 +1,22 @@
+# Dart/Pub
+.dart_tool/
+.packages
+.pub/
+pubspec.lock
+build/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+output/
+raw/
+*.epub
