@@ -4,6 +4,7 @@
 .pub/
 pubspec.lock
 build/
+*.lock
 
 # IDE
 .idea/
