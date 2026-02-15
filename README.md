@@ -248,6 +248,37 @@ epub_image_extractor raw/ output/
   
   **返回：** 一个 Map，键为图片路径，值为图片的字节数据（Uint8List）
 
+- `ImageInfo? getCoverImage(EpubExtractionResult result)`
+  
+  获取封面图片信息。
+  
+  **参数：**
+  - `result`: EPUB 提取结果
+  
+  **返回：** 封面图片信息（ImageInfo），如果未找到则返回 null
+  
+  **查找顺序：**
+  1. 通过元数据中的 cover-image 标识
+  2. 通过文件名包含 "cover" 关键词
+  3. 查找第一个标记为 keepOriginalName 且包含 cover 的图片
+
+- `Uint8List? getCoverImageData(EpubExtractionResult result)`
+  
+  获取封面图片的字节数据，可直接用于 Flutter 的 `Image.memory()`。
+  
+  **参数：**
+  - `result`: EPUB 提取结果
+  
+  **返回：** 封面图片的字节数据（Uint8List），如果未找到封面则返回 null
+  
+  **示例（Flutter）：**
+  ```dart
+  final coverData = parser.getCoverImageData(result);
+  if (coverData != null) {
+    Image.memory(coverData)
+  }
+  ```
+
 - `Future<int> saveImages(EpubExtractionResult result, Directory outputDir, {bool useTitleAsFolder = true})`
   
   保存提取的图片到指定目录。

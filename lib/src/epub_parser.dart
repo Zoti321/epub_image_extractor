@@ -201,6 +201,92 @@ class EpubParser {
     return imagesData;
   }
 
+  /// 获取封面图片信息
+  ///
+  /// [result] EPUB 提取结果
+  ///
+  /// 返回封面图片信息（ImageInfo），如果未找到则返回 null
+  ///
+  /// 查找顺序：
+  /// 1. 通过元数据中的 cover-image 标识（从 OPF manifest 中查找）
+  /// 2. 通过文件名包含 "cover" 关键词
+  /// 3. 查找第一个标记为 keepOriginalName 且包含 cover 的图片
+  ///
+  /// 示例：
+  /// ```dart
+  /// final coverImage = parser.getCoverImage(result);
+  /// if (coverImage != null) {
+  ///   print('封面路径: ${coverImage.path}');
+  ///   print('媒体类型: ${coverImage.mediaType}');
+  /// }
+  /// ```
+  ImageInfo? getCoverImage(EpubExtractionResult result) {
+    // 方法 1: 通过元数据中的 cover-image 查找
+    final coverImageId = result.metadata.customMetadata['cover-image'] ??
+        result.metadata.customMetadata['cover'];
+    if (coverImageId != null && coverImageId.isNotEmpty) {
+      // 尝试通过 ID 或路径查找
+      for (final image in result.images) {
+        final imageBasename = path.basename(image.path);
+        final imageBasenameLower = imageBasename.toLowerCase();
+        final coverBasename = path.basename(coverImageId);
+        final coverBasenameLower = coverBasename.toLowerCase();
+
+        // 检查路径是否匹配（可能是完整路径或相对路径）
+        if (image.path.contains(coverImageId) ||
+            coverImageId.contains(image.path) ||
+            imageBasename == coverImageId ||
+            imageBasename == coverBasename ||
+            imageBasenameLower == coverBasenameLower ||
+            imageBasenameLower.contains('cover') &&
+                coverBasenameLower.contains('cover')) {
+          return image;
+        }
+      }
+    }
+
+    // 方法 2: 通过文件名查找（文件名包含 cover）
+    for (final image in result.images) {
+      final fileName = path.basename(image.path).toLowerCase();
+      if (fileName.contains('cover')) {
+        return image;
+      }
+    }
+
+    // 方法 3: 查找第一个标记为 keepOriginalName 且包含 cover 的图片
+    for (final image in result.images) {
+      if (image.keepOriginalName) {
+        final fileName = path.basename(image.path).toLowerCase();
+        if (fileName.contains('cover')) {
+          return image;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /// 获取封面图片的字节数据
+  ///
+  /// [result] EPUB 提取结果
+  ///
+  /// 返回封面图片的字节数据（Uint8List），如果未找到封面则返回 null
+  ///
+  /// 示例（Flutter）：
+  /// ```dart
+  /// final coverData = parser.getCoverImageData(result);
+  /// if (coverData != null) {
+  ///   Image.memory(coverData)
+  /// }
+  /// ```
+  Uint8List? getCoverImageData(EpubExtractionResult result) {
+    final coverImage = getCoverImage(result);
+    if (coverImage != null) {
+      return getImageData(result, coverImage);
+    }
+    return null;
+  }
+
   /// 保存提取的图片到指定目录
   ///
   /// [result] EPUB 提取结果
@@ -295,11 +381,12 @@ class EpubParser {
     }
 
     // 提取作者（可能有多个）
-    final creators = _extractElementTexts(metadataElement, ['creator', 'dc:creator']);
+    final creators =
+        _extractElementTexts(metadataElement, ['creator', 'dc:creator']);
 
     // 提取贡献者
-    final contributors =
-        _extractElementTexts(metadataElement, ['contributor', 'dc:contributor']);
+    final contributors = _extractElementTexts(
+        metadataElement, ['contributor', 'dc:contributor']);
 
     // 提取描述
     final description =
@@ -325,16 +412,19 @@ class EpubParser {
         _extractElementTexts(metadataElement, ['subject', 'dc:subject']);
 
     // 提取版权
-    final rights = _extractElementText(metadataElement, ['rights', 'dc:rights']);
+    final rights =
+        _extractElementText(metadataElement, ['rights', 'dc:rights']);
 
     // 提取来源
-    final source = _extractElementText(metadataElement, ['source', 'dc:source']);
+    final source =
+        _extractElementText(metadataElement, ['source', 'dc:source']);
 
     // 提取类型
     final type = _extractElementText(metadataElement, ['type', 'dc:type']);
 
     // 提取格式
-    final format = _extractElementText(metadataElement, ['format', 'dc:format']);
+    final format =
+        _extractElementText(metadataElement, ['format', 'dc:format']);
 
     // 提取关联
     final relation =
@@ -348,7 +438,8 @@ class EpubParser {
     final customMetadata = <String, String>{};
     final metaElements = metadataElement.findAllElements('meta');
     for (final meta in metaElements) {
-      final name = meta.getAttribute('name') ?? meta.getAttribute('property') ?? '';
+      final name =
+          meta.getAttribute('name') ?? meta.getAttribute('property') ?? '';
       final content = meta.getAttribute('content') ?? meta.innerText.trim();
       if (name.isNotEmpty && content.isNotEmpty) {
         customMetadata[name] = content;
