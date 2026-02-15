@@ -83,12 +83,8 @@ class EpubParser {
     final opfXml =
         XmlDocument.parse(utf8.decode(opfEntry.content as List<int>));
 
-    // 提取标题
-    var title = _extractTitle(opfXml);
-    if (title.isEmpty) {
-      // 如果无法从 OPF 提取标题，使用文件名（不含扩展名）
-      title = path.basenameWithoutExtension(file.path);
-    }
+    // 提取元数据
+    final metadata = _extractMetadata(opfXml, file);
 
     // 提取图片并获取顺序
     final opfDir = path.dirname(opfPath);
@@ -99,10 +95,61 @@ class EpubParser {
     );
 
     return EpubExtractionResult(
-      title: title,
+      metadata: metadata,
       images: orderedImages,
       archive: archive,
     );
+  }
+
+  /// 只提取 EPUB 文件的元数据（不提取图片）
+  ///
+  /// [epubFile] EPUB 文件路径或 File 对象
+  /// 返回 [EpubMetadata] 包含完整的元数据信息
+  ///
+  /// 示例：
+  /// ```dart
+  /// final parser = EpubParser();
+  /// final metadata = await parser.extractMetadata(File('book.epub'));
+  /// print('标题: ${metadata.title}');
+  /// print('作者: ${metadata.creators.join(", ")}');
+  /// ```
+  Future<EpubMetadata> extractMetadata(dynamic epubFile) async {
+    final file = epubFile is File ? epubFile : File(epubFile.toString());
+    if (!await file.exists()) {
+      throw Exception('EPUB 文件不存在: ${file.path}');
+    }
+
+    // 读取 EPUB 文件（ZIP 格式）
+    final bytes = await file.readAsBytes();
+    final archive = ZipDecoder().decodeBytes(bytes);
+
+    // 查找 container.xml
+    final containerEntry = archive.findFile('META-INF/container.xml');
+    if (containerEntry == null) {
+      throw Exception('未找到 META-INF/container.xml');
+    }
+
+    // 解析 container.xml 获取 OPF 文件路径
+    final containerXml = XmlDocument.parse(
+      utf8.decode(containerEntry.content as List<int>),
+    );
+    final rootfile = containerXml.findAllElements('rootfile').first;
+    final opfPath = rootfile.getAttribute('full-path');
+    if (opfPath == null) {
+      throw Exception('未找到 OPF 文件路径');
+    }
+
+    // 读取 OPF 文件
+    final opfEntry = archive.findFile(opfPath);
+    if (opfEntry == null) {
+      throw Exception('未找到 OPF 文件: $opfPath');
+    }
+
+    final opfXml =
+        XmlDocument.parse(utf8.decode(opfEntry.content as List<int>));
+
+    // 提取元数据
+    return _extractMetadata(opfXml, file);
   }
 
   /// 获取图片的字节数据
@@ -170,7 +217,7 @@ class EpubParser {
 
     if (useTitleAsFolder) {
       // 创建输出文件夹（使用标题作为文件夹名）
-      final safeTitle = _sanitizeFileName(result.title);
+      final safeTitle = _sanitizeFileName(result.metadata.title);
       bookOutputDir = Directory(path.join(outputDir.path, safeTitle));
     } else {
       bookOutputDir = outputDir;
@@ -232,30 +279,135 @@ class EpubParser {
     return savedCount;
   }
 
-  String _extractTitle(XmlDocument opfXml) {
-    // 尝试从 metadata 中提取标题
-    final metadata = opfXml.findAllElements('metadata').firstOrNull;
-    if (metadata != null) {
-      // 查找 dc:title
-      final titleElements = metadata.findAllElements('title');
-      for (final titleElement in titleElements) {
-        final title = titleElement.text.trim();
-        if (title.isNotEmpty) {
-          return title;
-        }
-      }
+  EpubMetadata _extractMetadata(XmlDocument opfXml, File file) {
+    final metadataElement = opfXml.findAllElements('metadata').firstOrNull;
+    if (metadataElement == null) {
+      // 如果没有元数据，使用文件名作为标题
+      return EpubMetadata(
+        title: path.basenameWithoutExtension(file.path),
+      );
+    }
 
-      // 尝试查找带命名空间的 title
-      final dcTitleElements = metadata.findAllElements('dc:title');
-      for (final dcTitleElement in dcTitleElements) {
-        final title = dcTitleElement.text.trim();
-        if (title.isNotEmpty) {
-          return title;
-        }
+    // 提取标题
+    String title = _extractElementText(metadataElement, ['title', 'dc:title']);
+    if (title.isEmpty) {
+      title = path.basenameWithoutExtension(file.path);
+    }
+
+    // 提取作者（可能有多个）
+    final creators = _extractElementTexts(metadataElement, ['creator', 'dc:creator']);
+
+    // 提取贡献者
+    final contributors =
+        _extractElementTexts(metadataElement, ['contributor', 'dc:contributor']);
+
+    // 提取描述
+    final description =
+        _extractElementText(metadataElement, ['description', 'dc:description']);
+
+    // 提取出版商
+    final publisher =
+        _extractElementText(metadataElement, ['publisher', 'dc:publisher']);
+
+    // 提取日期
+    final date = _extractElementText(metadataElement, ['date', 'dc:date']);
+
+    // 提取语言
+    final language =
+        _extractElementText(metadataElement, ['language', 'dc:language']);
+
+    // 提取标识符
+    final identifier =
+        _extractElementText(metadataElement, ['identifier', 'dc:identifier']);
+
+    // 提取主题/标签
+    final subjects =
+        _extractElementTexts(metadataElement, ['subject', 'dc:subject']);
+
+    // 提取版权
+    final rights = _extractElementText(metadataElement, ['rights', 'dc:rights']);
+
+    // 提取来源
+    final source = _extractElementText(metadataElement, ['source', 'dc:source']);
+
+    // 提取类型
+    final type = _extractElementText(metadataElement, ['type', 'dc:type']);
+
+    // 提取格式
+    final format = _extractElementText(metadataElement, ['format', 'dc:format']);
+
+    // 提取关联
+    final relation =
+        _extractElementText(metadataElement, ['relation', 'dc:relation']);
+
+    // 提取覆盖范围
+    final coverage =
+        _extractElementText(metadataElement, ['coverage', 'dc:coverage']);
+
+    // 提取自定义元数据（meta 标签）
+    final customMetadata = <String, String>{};
+    final metaElements = metadataElement.findAllElements('meta');
+    for (final meta in metaElements) {
+      final name = meta.getAttribute('name') ?? meta.getAttribute('property') ?? '';
+      final content = meta.getAttribute('content') ?? meta.innerText.trim();
+      if (name.isNotEmpty && content.isNotEmpty) {
+        customMetadata[name] = content;
       }
     }
 
+    return EpubMetadata(
+      title: title,
+      creators: creators,
+      contributors: contributors,
+      description: description,
+      publisher: publisher,
+      date: date,
+      language: language,
+      identifier: identifier,
+      subjects: subjects,
+      rights: rights,
+      source: source,
+      type: type,
+      format: format,
+      relation: relation,
+      coverage: coverage,
+      customMetadata: customMetadata,
+    );
+  }
+
+  /// 提取单个元素文本（尝试多个标签名）
+  String _extractElementText(
+    XmlElement parent,
+    List<String> tagNames,
+  ) {
+    for (final tagName in tagNames) {
+      final elements = parent.findAllElements(tagName);
+      for (final element in elements) {
+        final text = element.innerText.trim();
+        if (text.isNotEmpty) {
+          return text;
+        }
+      }
+    }
     return '';
+  }
+
+  /// 提取多个元素文本（尝试多个标签名）
+  List<String> _extractElementTexts(
+    XmlElement parent,
+    List<String> tagNames,
+  ) {
+    final results = <String>[];
+    for (final tagName in tagNames) {
+      final elements = parent.findAllElements(tagName);
+      for (final element in elements) {
+        final text = element.innerText.trim();
+        if (text.isNotEmpty && !results.contains(text)) {
+          results.add(text);
+        }
+      }
+    }
+    return results;
   }
 
   Future<List<ImageInfo>> _extractOrderedImages(

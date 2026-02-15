@@ -1,15 +1,19 @@
 # epub_image_extractor
 
+[![pub package](https://img.shields.io/pub/v/epub_image_extractor.svg)](https://pub.dev/packages/epub_image_extractor)
+[![pub points](https://img.shields.io/pub/points/epub_image_extractor)](https://pub.dev/packages/epub_image_extractor/score)
+
 一个强大的 Dart package，用于从 EPUB 文件中提取标题和图片，支持按阅读顺序排序和智能重命名。
 
 ## 功能特性
 
-- 📖 **提取标题**：从 EPUB 元数据中提取书籍标题
+- 📖 **提取完整元数据**：从 EPUB 中提取标题、作者、描述、日期、语言等完整元数据
 - 🖼️ **提取图片**：提取 EPUB 中的所有图片资源
 - 📑 **按顺序排序**：根据 EPUB 的 spine（阅读顺序）和内容文件中的出现顺序对图片进行排序
 - 🏷️ **智能重命名**：普通图片按顺序重命名为 `0001.jpg`, `0002.png` 等
 - 📎 **保持原名**：封面图和特殊图片（如 `cover.jpg`, `theendinfo.png`）保持原始文件名
 - 🔧 **易于使用**：提供简洁的 API 和命令行工具
+- ⚡ **高性能**：支持只提取元数据，无需加载图片数据
 
 ## 安装
 
@@ -68,8 +72,14 @@ void main() async {
   final epubFile = File('book.epub');
   final result = await parser.extract(epubFile);
 
-  print('标题: ${result.title}');
+  print('标题: ${result.metadata.title}');
+  print('作者: ${result.metadata.creators.join(", ")}');
   print('图片数量: ${result.images.length}');
+  
+  // 或者只提取元数据
+  final metadata = await parser.extractMetadata(epubFile);
+  print('描述: ${metadata.description}');
+  print('语言: ${metadata.language}');
 
   // 保存图片
   final outputDir = Directory('output');
@@ -124,19 +134,27 @@ class _EpubViewerState extends State<EpubViewer> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return ListView.builder(
-      itemCount: _result!.images.length,
-      itemBuilder: (context, index) {
-        final imageInfo = _result!.images[index];
-        final imageData = _parser.getImageData(_result!, imageInfo);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(_result!.metadata.title),
+        subtitle: _result!.metadata.creators.isNotEmpty
+            ? Text(_result!.metadata.creators.first)
+            : null,
+      ),
+      body: ListView.builder(
+        itemCount: _result!.images.length,
+        itemBuilder: (context, index) {
+          final imageInfo = _result!.images[index];
+          final imageData = _parser.getImageData(_result!, imageInfo);
 
-        if (imageData == null) {
-          return const SizedBox.shrink();
-        }
+          if (imageData == null) {
+            return const SizedBox.shrink();
+          }
 
-        // 直接使用 Image.memory 显示图片
-        return Image.memory(imageData);
-      },
+          // 直接使用 Image.memory 显示图片
+          return Image.memory(imageData);
+        },
+      ),
     );
   }
 }
@@ -195,12 +213,21 @@ epub_image_extractor raw/ output/
 
 - `Future<EpubExtractionResult> extract(dynamic epubFile)`
   
-  从 EPUB 文件中提取标题和图片。
+  从 EPUB 文件中提取完整元数据和图片。
   
   **参数：**
   - `epubFile`: EPUB 文件路径（String）或 File 对象
   
-  **返回：** `EpubExtractionResult` 包含标题和按顺序排列的图片列表
+  **返回：** `EpubExtractionResult` 包含完整元数据和按顺序排列的图片列表
+
+- `Future<EpubMetadata> extractMetadata(dynamic epubFile)`
+  
+  只提取 EPUB 文件的元数据（不提取图片），性能更快。
+  
+  **参数：**
+  - `epubFile`: EPUB 文件路径（String）或 File 对象
+  
+  **返回：** `EpubMetadata` 包含完整的元数据信息
 
 - `Uint8List? getImageData(EpubExtractionResult result, ImageInfo imageInfo)`
   
@@ -240,8 +267,33 @@ epub_image_extractor raw/ output/
 
 EPUB 提取结果。
 
-- `title`: 书籍标题（String）
+- `metadata`: EPUB 元数据（EpubMetadata）
 - `images`: 图片列表（List<ImageInfo>），按阅读顺序排列
+- `archive`: EPUB 文件的 ZIP 归档（用于获取图片数据）
+- `title`: 书籍标题（String，已弃用，使用 `metadata.title` 代替）
+
+### EpubMetadata
+
+EPUB 元数据模型。
+
+- `title`: 标题（String）
+- `creators`: 作者列表（List<String>）
+- `contributors`: 贡献者列表（List<String>）
+- `description`: 描述（String）
+- `publisher`: 出版商（String）
+- `date`: 发布日期（String）
+- `language`: 语言（String）
+- `identifier`: 标识符，如 ISBN（String）
+- `subjects`: 主题/标签列表（List<String>）
+- `rights`: 版权信息（String）
+- `source`: 来源（String）
+- `type`: 类型（String）
+- `format`: 格式（String）
+- `relation`: 关联资源（String）
+- `coverage`: 覆盖范围（String）
+- `customMetadata`: 自定义元数据（Map<String, String>）
+- `primaryCreator`: 主要作者（String，第一个作者）
+- `hasCreator`: 是否有作者信息（bool）
 
 ### ImageInfo
 
@@ -301,4 +353,6 @@ MIT License - 查看 [LICENSE](LICENSE) 文件了解详情
 ## 相关文档
 
 - [集成指南](INTEGRATION.md) - 如何在项目中使用此包
-- [发布指南](PUBLISH.md) - 如何发布到 pub.dev
+- [发布指南](PUBLISH_TO_PUBDEV.md) - 如何发布到 pub.dev
+- [Publisher 设置指南](PUBLISHER_SETUP.md) - 如何创建和验证 Publisher
+- [GitHub 设置指南](GITHUB_SETUP.md) - 如何推送到 GitHub

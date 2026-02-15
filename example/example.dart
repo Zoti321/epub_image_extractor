@@ -11,7 +11,9 @@ void main() async {
     final epubFile = File('example.epub');
     final result = await parser.extract(epubFile);
 
-    print('标题: ${result.title}');
+    print('标题: ${result.metadata.title}');
+    print('作者: ${result.metadata.creators.join(", ")}');
+    print('描述: ${result.metadata.description}');
     print('图片数量: ${result.images.length}');
 
     // 保存图片到指定目录
@@ -62,7 +64,7 @@ void main() async {
   // 使用自定义解析器
   try {
     final customResult = await customParser.extract(File('example.epub'));
-    print('使用自定义解析器提取: ${customResult.title}');
+    print('使用自定义解析器提取: ${customResult.metadata.title}');
   } catch (e) {
     print('错误: $e');
   }
@@ -70,8 +72,11 @@ void main() async {
   // 示例 3: 只提取信息，不保存文件
   try {
     final result = await parser.extract(File('example.epub'));
-    print('标题: ${result.title}');
-
+    print('标题: ${result.metadata.title}');
+    print('作者: ${result.metadata.creators.join(", ")}');
+    print('语言: ${result.metadata.language}');
+    print('出版商: ${result.metadata.publisher}');
+    
     for (final image in result.images) {
       print('图片: ${image.path}');
       print('  媒体类型: ${image.mediaType}');

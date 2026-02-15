@@ -38,7 +38,8 @@ void main() async {
 
       // 提取 EPUB
       final result = await parser.extract(epubFile);
-      print('  标题: ${result.title}');
+      print('  标题: ${result.metadata.title}');
+      print('  作者: ${result.metadata.creators.join(", ")}');
       print('  找到 ${result.images.length} 张图片');
 
       // 保存图片
